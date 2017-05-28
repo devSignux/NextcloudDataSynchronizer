@@ -1,0 +1,8 @@
+inputUri=
+inputSubfolder=
+inputUsername=
+inputPassword=
+outputUri=
+outputSubfolder=
+outputUsername=
+outputPassword=
