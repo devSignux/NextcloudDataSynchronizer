@@ -10,15 +10,23 @@ public class Synchronizer {
 
 	private ConnectionSettings inputConnection;
 	private ConnectionSettings outputConnection;
+	
+	private static String tmpDirPath = "ncds";
+	private File tempDir; 
 
-	public static void main(String[] args) {
-		Synchronizer synchronizer = new Synchronizer();
-		if (!synchronizer.loadSettings(args)) {
+	public Synchronizer(String[] args) {
+		if (!loadSettings(args)) {
 			return;
 		}
-
+		createTempFolder();
 	}
-
+	
+	
+	public static void main(String[] args) {
+		Synchronizer synchronizer = new Synchronizer(args);
+		synchronizer.synchronizeData();
+	}
+	
 	private boolean loadSettings(String[] args) {
 
 		String filename = "settings.txt";
@@ -47,6 +55,19 @@ public class Synchronizer {
 			System.out.println("Can't load file: " + filename);
 			return false;
 		}
+		return true;
+	}
+	
+	private void createTempFolder() {
+		String path = System.getProperty("java.io.tmpdir");
+		tempDir = new File(path+"/"+tmpDirPath);
+		if (!tempDir.exists()) {
+			tempDir.mkdirs();
+		}
+		tempDir.deleteOnExit();
+	}
+
+	private boolean synchronizeData() {
 		return true;
 	}
 }
