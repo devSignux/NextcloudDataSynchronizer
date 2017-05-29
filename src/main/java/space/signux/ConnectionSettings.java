@@ -37,4 +37,12 @@ public class ConnectionSettings {
 	public void setSubfolder(String subfolder) {
 		this.subfolder = subfolder;
 	}
+	
+	public String getUserFolder() {
+		String userFolder="remote.php/dav/files/"+username+"/";
+		if(subfolder!=null && !subfolder.isEmpty()) {
+			userFolder=subfolder+"/"+userFolder;
+		}
+		return userFolder;
+	}
 }
