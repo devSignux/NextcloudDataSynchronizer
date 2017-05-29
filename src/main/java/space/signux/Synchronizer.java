@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Properties;
 
 import org.apache.log4j.Logger;
+import org.apache.log4j.xml.DOMConfigurator;
 
 import com.github.sardine.DavResource;
 import com.github.sardine.Sardine;
@@ -36,6 +37,8 @@ public class Synchronizer {
 
 	public static void main(String[] args) {
 		log.debug("start main()");
+
+		DOMConfigurator.configureAndWatch( "log4j-4.xml", 60*1000 );
 
 		Synchronizer synchronizer = new Synchronizer(args);
 		synchronizer.synchronizeData();
@@ -105,7 +108,10 @@ public class Synchronizer {
 		String startOutputFolder = outputConnection.getUserFolder();
 
 		log.info("start synchronizing");
+		
 		synchronizeResources(input, output, startInputFolder, startOutputFolder);
+		
+		log.info("synchronizing finished");
 
 		log.debug("synchronizeData() finished");
 		return true;
