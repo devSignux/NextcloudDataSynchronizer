@@ -6,6 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 
@@ -25,6 +26,9 @@ public class Synchronizer {
 	private static Logger log = Logger.getLogger(Synchronizer.class);
 
 	private File tempDir;
+	
+	private Sardine input;
+	private Sardine output;
 
 	public Synchronizer(String[] args) {
 		log.debug("create Synchronizer(args: " + args + ")");
@@ -103,100 +107,126 @@ public class Synchronizer {
 
 		log.debug("start synchronizeData()");
 
-		Sardine input = SardineFactory.begin(inputConnection.getUsername(), inputConnection.getPassword());
-		Sardine output = SardineFactory.begin(outputConnection.getUsername(), outputConnection.getPassword());
+		input = SardineFactory.begin(inputConnection.getUsername(), inputConnection.getPassword());
+		output = SardineFactory.begin(outputConnection.getUsername(), outputConnection.getPassword());
 
 		String startInputFolder = inputConnection.getUserFolder();
 		String startOutputFolder = outputConnection.getUserFolder();
 
-		log.info("start synchronizing");
-
-		synchronizeResources(input, output, startInputFolder, startOutputFolder);
-
-		log.info("synchronizing finished");
-
-		log.debug("synchronizeData() finished");
-		return true;
-	}
-
-	private void synchronizeResources(Sardine input, Sardine output, String startInputFolder,
-			String startOutputFolder) {
-		log.debug("start synchronizeResources(startInputFolder: " + startInputFolder + " )");
-
 		try {
+			log.info("read input resources");
 			List<DavResource> resourcesInput = getResourcesList(input, inputConnection, startInputFolder);
+			log.info("read output resources");
 			List<DavResource> resourcesOutput = getResourcesList(output, outputConnection, startOutputFolder);
+			log.info("read finished");
 
-			if (resourcesInput.size() != resourcesOutput.size()) {
-				log.info("different folder size.. input: " + resourcesInput.size() + " output: "
-						+ resourcesOutput.size());
-			}
-
-			for (int i = 0; i < resourcesInput.size();) {
-
-				DavResource inputResources = resourcesInput.get(i);
-				DavResource outputResources = getExistingResource(resourcesOutput, inputResources);
-
-				if (outputResources == null) {
-					log.info("output path doesn't exist: " + inputResources.getPath() + " size: "
-							+ inputResources.getContentLength());
-
-					String putUrl = createEncodedUrl(outputConnection, inputResources.getPath());
-
-					log.debug("putUrl: " + putUrl);
-
-					// check if input resource is a directory, than create a new
-					// directory
-					if (inputResources.getContentLength() == -1) {
-						log.info("create output directory: " + putUrl);
-						output.createDirectory(putUrl);
-						resourcesOutput = getResourcesList(output, outputConnection, startOutputFolder);
-						continue;
-					} else {
-						String getUrl = createEncodedUrl(inputConnection, inputResources.getPath());
-						InputStream inputStream = input.get(getUrl);
-
-						try {
-							log.info("write input resource: " + inputResources.getPath() + " into temporarly file");
-							File tmpInputFile = writeStreamIntoFile(inputResources, inputStream);
-
-							log.info("write temporarly file into output resource: " + putUrl);
-							output.put(putUrl, tmpInputFile, inputResources.getContentType());
-
-							log.debug("delete temporarly file: " + tmpInputFile.getPath());
-							tmpInputFile.delete();
-						} catch (FileNotFoundException ex) {
-							log.error("can't create tmeporarly file for input resource: " + inputResources.getPath(),
-									ex);
-						} catch (IOException ex) {
-							log.error("error while reading input stream or writing data into temporarly file", ex);
-						}
-					}
-				}
-
-				// check if size of file is different
-				if (outputResources != null && inputResources.getContentLength() != inputResources.getContentLength()) {
-					log.warn("ContentLength is different input resource: " + inputResources.getPath() + "("
-							+ inputResources.getContentLength() + ") output resource: " + outputResources.getPath()
-							+ "(" + outputResources.getContentLength() + ")");
-				}
-				// if input and output resource are folders and both exist, than
-				// start with the internal content
-				if (inputResources.getContentLength() == -1 && outputResources != null
-						&& !inputResources.getPath().equals(startInputFolder)
-						&& inputResources.getEtag() != outputResources.getEtag()) {
-					synchronizeResources(input, output, inputResources.getPath(), outputResources.getPath());
-				}
-				// go to the next input resource if we have the current
-				// file/folder completed
-				i++;
-			}
+			archiveResources(resourcesInput, resourcesOutput);
 
 		} catch (IOException e) {
 			log.error(e.getMessage(), e);
 		}
 
-		log.debug("synchronizeResources(startInputFolder: " + startInputFolder + " ) finished");
+		log.debug("synchronizeData() finished");
+		return true;
+	}
+
+	private void archiveResources(List<DavResource> resourcesInput, List<DavResource> resourcesOutput) {
+		List<DavResource> notExistendResources = new LinkedList<DavResource>();
+		List<DavResource> contentLengthDiffersResources = new LinkedList<DavResource>();
+
+		for (DavResource inputResource : resourcesInput) {
+			DavResource removeResource = null;
+			boolean notExist = true;
+			for (DavResource outputResource : resourcesOutput) {
+				if (inputResource.getPath().equals(outputResource.getPath())) {
+					log.debug(inputResource.getPath()+" exist on output");
+					if (!inputResource.isDirectory() && inputResource.getModified().after(outputResource.getModified())) {
+						log.debug(inputResource.getPath()+" has on input a newer modifierd date");
+						if (!inputResource.getContentLength().equals(outputResource.getContentLength())) {
+							log.debug(inputResource.getPath() + " has a different content length: " + inputResource.getContentLength() + " <-> "
+									+ outputResource.getContentLength());
+							contentLengthDiffersResources.add(inputResource);
+						}
+						removeResource = outputResource;
+					}
+					notExist = false;
+					break;
+				}
+			}
+			if (removeResource != null) {
+				resourcesOutput.remove(removeResource);
+			}
+			if (notExist) {
+				notExistendResources.add(inputResource);
+			}
+		}
+		addNewResources(notExistendResources);
+		updateResources(contentLengthDiffersResources);
+	}
+
+	private void updateResources(List<DavResource> updateResources) {
+		log.debug("update "+updateResources.size()+ " resources");
+		for (DavResource resource : updateResources) {
+			updateResource(resource);
+		}
+		log.debug("update resources finished");
+	}
+
+	private void addNewResources(List<DavResource> newResources) {
+		log.debug("create "+newResources.size()+ " new resources");
+		while (newResources.size() > 0) {
+			List<DavResource> createdFolders = new LinkedList<DavResource>();
+			// first add new folders
+			for (DavResource newResource : newResources) {
+				if (newResource.isDirectory()) {
+					String putUrl = createEncodedUrl(outputConnection, newResource.getPath());
+					log.info("create output directory: " + putUrl);
+					try {
+						output.createDirectory(putUrl);
+						createdFolders.add(newResource);
+					} catch (IOException e) {
+						log.warn(newResource.getPath() + " can't create folder...");
+					}
+				}
+			}
+			newResources.removeAll(createdFolders);
+			List<DavResource> createdFiles = new LinkedList<DavResource>();
+			for (DavResource newResource : newResources) {
+				if (newResource.isDirectory()) {
+					break;
+				}
+				if(updateResource(newResource)) {
+					createdFiles.add(newResource);
+				}
+			}
+			newResources.removeAll(createdFiles);
+		}
+		log.debug("new created resources finished");
+	}
+
+	private boolean updateResource(DavResource newResource) {
+		String getUrl = createEncodedUrl(inputConnection, newResource.getPath());
+
+		try {
+			InputStream inputStream = input.get(getUrl);
+			// todo: check if free space is available
+			log.info("write input resource: " + newResource.getPath() + " into temporarly file");
+			File tmpInputFile = writeStreamIntoFile(newResource, inputStream);
+
+			String putUrl = createEncodedUrl(outputConnection, newResource.getPath());
+			log.info("write temporarly file into output resource: " + putUrl);
+			output.put(putUrl, tmpInputFile, newResource.getContentType());
+
+			log.debug("delete temporarly file: " + tmpInputFile.getPath());
+			tmpInputFile.delete();
+			return true;
+		} catch (FileNotFoundException ex) {
+			log.error("can't create tmeporarly file for input resource: " + newResource.getPath(),
+					ex);
+		} catch (IOException ex) {
+			log.error("error while reading input stream or writing data into temporarly file", ex);
+		}
+		return false;
 	}
 
 	private String createEncodedUrl(ConnectionSettings settings, String folderPath) {
@@ -230,24 +260,12 @@ public class Synchronizer {
 		return tmpInputFile;
 	}
 
-	private DavResource getExistingResource(List<DavResource> resourcesOutput, DavResource inputResources) {
-		DavResource outputResources = null;
-		for (DavResource res : resourcesOutput) {
-			if (res.getName().equals(inputResources.getName())
-					&& res.getPath().length() == (inputResources.getPath().length())) {
-				outputResources = res;
-				break;
-			}
-		}
-		return outputResources;
-	}
-
 	private List<DavResource> getResourcesList(Sardine sardine, ConnectionSettings settings, String folder)
 			throws IOException {
 		log.debug("start getResourcesList()");
 
 		String urlInput = createEncodedUrl(settings, folder);
-		List<DavResource> resources = sardine.list(urlInput);
+		List<DavResource> resources = sardine.list(urlInput, -1);
 
 		log.debug("getResourcesList() finished");
 		return resources;
