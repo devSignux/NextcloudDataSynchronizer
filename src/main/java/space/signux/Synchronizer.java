@@ -10,6 +10,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 
+import org.apache.commons.io.FileSystemUtils;
 import org.apache.log4j.Logger;
 import org.apache.log4j.xml.DOMConfigurator;
 
@@ -142,12 +143,12 @@ public class Synchronizer {
 					log.debug(inputResource.getPath() + " exist on output");
 					if (!inputResource.isDirectory()
 							&& inputResource.getModified().after(outputResource.getModified())) {
-						log.debug(inputResource.getPath() + " has on input a newer modifierd date");
+						log.info(inputResource.getPath() + " has on input a newer modifierd date");
 						if (!inputResource.getContentLength().equals(outputResource.getContentLength())) {
 							log.debug(inputResource.getPath() + " has a different content length: "
 									+ inputResource.getContentLength() + " <-> " + outputResource.getContentLength());
-							contentLengthDiffersResources.add(inputResource);
 						}
+						contentLengthDiffersResources.add(inputResource);
 						removeResource = outputResource;
 					}
 					notExist = false;
@@ -243,9 +244,10 @@ public class Synchronizer {
 
 		File tmpInputFile = new File(tempDir.getAbsolutePath() + File.pathSeparator + inputResources.getName());
 		
-		log.debug("free tmp space: " + tmpInputFile.getFreeSpace());
-		if (tmpInputFile.getFreeSpace() < inputResources.getContentLength()) {
-			log.warn("not enough space ( " + tmpInputFile.getFreeSpace() + " ) for: " + inputResources.getPath()
+		Long freeSpace = FileSystemUtils.freeSpaceKb(tempDir.getAbsolutePath())*1024;
+		log.debug("free tmp space: " + freeSpace);
+		if (freeSpace < inputResources.getContentLength()) {
+			log.warn("not enough space ( " + freeSpace + " ) for: " + inputResources.getPath()
 					+ " size: " + inputResources.getContentLength());
 			throw new IOException("Not enough space");
 		}
