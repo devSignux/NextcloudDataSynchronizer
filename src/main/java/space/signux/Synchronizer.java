@@ -26,7 +26,7 @@ public class Synchronizer {
 	private static Logger log = Logger.getLogger(Synchronizer.class);
 
 	private File tempDir;
-	
+
 	private Sardine input;
 	private Sardine output;
 
@@ -139,12 +139,13 @@ public class Synchronizer {
 			boolean notExist = true;
 			for (DavResource outputResource : resourcesOutput) {
 				if (inputResource.getPath().equals(outputResource.getPath())) {
-					log.debug(inputResource.getPath()+" exist on output");
-					if (!inputResource.isDirectory() && inputResource.getModified().after(outputResource.getModified())) {
-						log.debug(inputResource.getPath()+" has on input a newer modifierd date");
+					log.debug(inputResource.getPath() + " exist on output");
+					if (!inputResource.isDirectory()
+							&& inputResource.getModified().after(outputResource.getModified())) {
+						log.debug(inputResource.getPath() + " has on input a newer modifierd date");
 						if (!inputResource.getContentLength().equals(outputResource.getContentLength())) {
-							log.debug(inputResource.getPath() + " has a different content length: " + inputResource.getContentLength() + " <-> "
-									+ outputResource.getContentLength());
+							log.debug(inputResource.getPath() + " has a different content length: "
+									+ inputResource.getContentLength() + " <-> " + outputResource.getContentLength());
 							contentLengthDiffersResources.add(inputResource);
 						}
 						removeResource = outputResource;
@@ -165,7 +166,7 @@ public class Synchronizer {
 	}
 
 	private void updateResources(List<DavResource> updateResources) {
-		log.debug("update "+updateResources.size()+ " resources");
+		log.debug("update " + updateResources.size() + " resources");
 		for (DavResource resource : updateResources) {
 			updateResource(resource);
 		}
@@ -173,7 +174,7 @@ public class Synchronizer {
 	}
 
 	private void addNewResources(List<DavResource> newResources) {
-		log.debug("create "+newResources.size()+ " new resources");
+		log.debug("create " + newResources.size() + " new resources");
 		while (newResources.size() > 0) {
 			List<DavResource> createdFolders = new LinkedList<DavResource>();
 			// first add new folders
@@ -195,7 +196,7 @@ public class Synchronizer {
 				if (newResource.isDirectory()) {
 					break;
 				}
-				if(updateResource(newResource)) {
+				if (updateResource(newResource)) {
 					createdFiles.add(newResource);
 				}
 			}
@@ -221,8 +222,7 @@ public class Synchronizer {
 			tmpInputFile.delete();
 			return true;
 		} catch (FileNotFoundException ex) {
-			log.error("can't create tmeporarly file for input resource: " + newResource.getPath(),
-					ex);
+			log.error("can't create tmeporarly file for input resource: " + newResource.getPath(), ex);
 		} catch (IOException ex) {
 			log.error("error while reading input stream or writing data into temporarly file", ex);
 		}
@@ -242,6 +242,14 @@ public class Synchronizer {
 		log.debug("start writeStreamIntoFile()");
 
 		File tmpInputFile = new File(tempDir.getAbsolutePath() + File.pathSeparator + inputResources.getName());
+		
+		log.debug("free tmp space: " + tmpInputFile.getFreeSpace());
+		if (tmpInputFile.getFreeSpace() < inputResources.getContentLength()) {
+			log.warn("not enough space ( " + tmpInputFile.getFreeSpace() + " ) for: " + inputResources.getPath()
+					+ " size: " + inputResources.getContentLength());
+			throw new IOException("Not enough space");
+		}
+		
 		FileOutputStream tmpFileOutputStream = new FileOutputStream(tmpInputFile);
 
 		int nRead;
