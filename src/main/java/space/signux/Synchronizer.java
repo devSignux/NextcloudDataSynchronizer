@@ -117,6 +117,7 @@ public class Synchronizer {
 		try {
 			log.info("read input resources");
 			List<DavResource> resourcesInput = getResourcesList(input, inputConnection, startInputFolder);
+			logRecourceList(resourcesInput);
 			log.info("read output resources");
 			List<DavResource> resourcesOutput = getResourcesList(output, outputConnection, startOutputFolder);
 			log.info("read finished");
@@ -129,6 +130,19 @@ public class Synchronizer {
 
 		log.debug("synchronizeData() finished");
 		return true;
+	}
+
+	private void logRecourceList(List<DavResource> resourcesInput) {
+		int directories = 0;
+		int files = 0;
+		for (DavResource davResource : resourcesInput) {
+			if (davResource.isDirectory()) {
+				directories++;
+			} else {
+				files++;
+			}
+		}
+		log.info("Found " + directories + " directories and " + files + " files");
 	}
 
 	private void archiveResources(List<DavResource> resourcesInput, List<DavResource> resourcesOutput) {
@@ -168,8 +182,11 @@ public class Synchronizer {
 
 	private void updateResources(List<DavResource> updateResources) {
 		log.debug("update " + updateResources.size() + " resources");
+		int count = 1;
 		for (DavResource resource : updateResources) {
+			log.info("update " + count + " from " + updateResources.size());
 			updateResource(resource);
+			count++;
 		}
 		log.debug("update resources finished");
 	}
@@ -211,8 +228,8 @@ public class Synchronizer {
 
 		try {
 			InputStream inputStream = input.get(getUrl);
-			// todo: check if free space is available
-			log.info("write input resource: " + newResource.getPath() + " into temporarly file");
+			log.info("write input resource: " + newResource.getPath() + " ("
+					+ (newResource.getContentLength() / 1024. / 1024.) + " Mb) into temporarly file");
 			File tmpInputFile = writeStreamIntoFile(newResource, inputStream);
 
 			String putUrl = createEncodedUrl(outputConnection, newResource.getPath());
@@ -243,15 +260,15 @@ public class Synchronizer {
 		log.debug("start writeStreamIntoFile()");
 
 		File tmpInputFile = new File(tempDir.getAbsolutePath() + File.pathSeparator + inputResources.getName());
-		
-		Long freeSpace = FileSystemUtils.freeSpaceKb(tempDir.getAbsolutePath())*1024;
+
+		Long freeSpace = FileSystemUtils.freeSpaceKb(tempDir.getAbsolutePath()) * 1024;
 		log.debug("free tmp space: " + freeSpace);
 		if (freeSpace < inputResources.getContentLength()) {
-			log.warn("not enough space ( " + freeSpace + " ) for: " + inputResources.getPath()
-					+ " size: " + inputResources.getContentLength());
+			log.warn("not enough space ( " + freeSpace + " ) for: " + inputResources.getPath() + " size: "
+					+ inputResources.getContentLength());
 			throw new IOException("Not enough space");
 		}
-		
+
 		FileOutputStream tmpFileOutputStream = new FileOutputStream(tmpInputFile);
 
 		int nRead;
