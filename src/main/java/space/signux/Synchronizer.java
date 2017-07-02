@@ -6,6 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
@@ -32,7 +33,7 @@ public class Synchronizer {
 	private Sardine output;
 
 	public Synchronizer(String[] args) {
-		log.debug("create Synchronizer(args: " + args + ")");
+		log.debug("create Synchronizer(args: " + Arrays.deepToString(args) + ")");
 
 		if (!loadSettings(args)) {
 			return;
@@ -54,7 +55,7 @@ public class Synchronizer {
 	}
 
 	private boolean loadSettings(String[] args) {
-		log.info("start loadSettings(args: " + args + ")");
+		log.info("start loadSettings(args: " + Arrays.deepToString(args) + ")");
 
 		String filename = "settings.txt";
 		if (args.length > 0) {
@@ -120,6 +121,7 @@ public class Synchronizer {
 			logRecourceList(resourcesInput);
 			log.info("read output resources");
 			List<DavResource> resourcesOutput = getResourcesList(output, outputConnection, startOutputFolder);
+			logRecourceList(resourcesOutput);
 			log.info("read finished");
 
 			archiveResources(resourcesInput, resourcesOutput);
@@ -135,14 +137,29 @@ public class Synchronizer {
 	private void logRecourceList(List<DavResource> resourcesInput) {
 		int directories = 0;
 		int files = 0;
+		long contentLength = 0;
 		for (DavResource davResource : resourcesInput) {
+			contentLength += davResource.getContentLength();
 			if (davResource.isDirectory()) {
 				directories++;
 			} else {
 				files++;
 			}
 		}
-		log.info("Found " + directories + " directories and " + files + " files");
+
+		log.info("Found directories: " + directories + " files: " + files + " content length: "
+				+ getFormatedContentLength(contentLength));
+	}
+
+	private String getFormatedContentLength(long contentLength) {
+		int unit = 0;
+		for (; contentLength > 1048576; contentLength >>= 10) {
+			unit++;
+		}
+		if (contentLength > 1024) {
+			unit++;
+		}
+		return String.format("%.3f %cB", contentLength / 1024f, " kMGTPE".charAt(unit));
 	}
 
 	private void archiveResources(List<DavResource> resourcesInput, List<DavResource> resourcesOutput) {
