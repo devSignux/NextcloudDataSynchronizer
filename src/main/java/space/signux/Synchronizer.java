@@ -246,7 +246,7 @@ public class Synchronizer {
 		try {
 			InputStream inputStream = input.get(getUrl);
 			log.info("write input resource: " + newResource.getPath() + " ("
-					+ (newResource.getContentLength() / 1024. / 1024.) + " Mb) into temporarly file");
+					+ getFormatedContentLength(newResource.getContentLength())+") into temporarly file");
 			File tmpInputFile = writeStreamIntoFile(newResource, inputStream);
 
 			String putUrl = createEncodedUrl(outputConnection, newResource.getPath());
