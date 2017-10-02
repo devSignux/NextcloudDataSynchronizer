@@ -7,6 +7,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
@@ -23,6 +25,8 @@ public class Synchronizer {
 
 	private ConnectionSettings inputConnection;
 	private ConnectionSettings outputConnection;
+	private Integer maxFileSize;
+	private Integer deleteOldInputFiles;
 
 	private static String tmpDirPath = "ncds";
 	private static Logger log = Logger.getLogger(Synchronizer.class);
@@ -78,6 +82,20 @@ public class Synchronizer {
 
 			inputConnection = SettingsReader.CreateInputConnectionSettings(properties);
 			outputConnection = SettingsReader.CreateOutputConnectionSettings(properties);
+
+			// read property maxFileSize
+			try {
+				maxFileSize = Integer.parseInt(properties.getProperty("maxFileSize", null));
+			} catch (ClassCastException e) {
+				log.warn("Can't parse value for property maxFileSize");
+			}
+
+			// read property deleteOldInputFiles
+			try {
+				deleteOldInputFiles = Integer.parseInt(properties.getProperty("deleteOldInputFiles", null));
+			} catch (ClassCastException e) {
+				log.warn("Can't parse value for property deleteOldInputFiles");
+			}
 		} catch (FileNotFoundException e) {
 			log.error("Can't find file: " + filename);
 			return false;
@@ -126,12 +144,62 @@ public class Synchronizer {
 
 			archiveResources(resourcesInput, resourcesOutput);
 
+			if (deleteOldInputFiles > 0) {
+				log.info("delete files which are older than " + deleteOldInputFiles + " days.");
+				deleteOldResources(getResourcesList(input, inputConnection, startInputFolder),
+						getResourcesList(output, outputConnection, startOutputFolder));
+
+			}
+
 		} catch (IOException e) {
 			log.error(e.getMessage(), e);
 		}
 
 		log.debug("synchronizeData() finished");
 		return true;
+	}
+
+	private void deleteOldResources(List<DavResource> resourcesInput, List<DavResource> resourcesOutput) {
+
+		// calculate delete date
+		Calendar calendar = Calendar.getInstance();
+		calendar.setTime(new Date());
+		calendar.add(Calendar.DATE, -deleteOldInputFiles);
+		long deleteTimestamp = calendar.getTime().getTime();
+
+		log.info("delete all files which are older than: " + new Date(deleteTimestamp));
+
+		long files = 0;
+		long contentLength = 0;
+		for (DavResource inputResource : resourcesInput) {
+
+			if (!inputResource.isDirectory() && inputResource.getModified().getTime() < deleteTimestamp
+					&& existsOutPutFile(inputResource, resourcesOutput)) {
+				log.info("delete Path: " + inputResource.getPath() + " ContentLength: "
+						+ inputResource.getContentLength() + " Date:" + inputResource.getModified().toString());
+				try {
+					String url = createEncodedUrl(inputConnection, inputResource.getPath());
+					input.delete(url);
+
+					log.info("Path: " + inputResource.getPath() + " deleted.");
+					files++;
+					contentLength += inputResource.getContentLength();
+				} catch (IOException e) {
+					log.error(e);
+				}
+			}
+		}
+		log.info("Deleted files: " + files + " content length: " + getFormatedContentLength(contentLength));
+	}
+
+	private boolean existsOutPutFile(DavResource inputResource, List<DavResource> resourcesOutput) {
+		for (DavResource outputResource : resourcesOutput) {
+			if (outputResource.getPath().equals(inputResource.getPath())
+					&& outputResource.getContentLength() == inputResource.getContentLength()) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private void logRecourceList(List<DavResource> resourcesInput) {
@@ -171,9 +239,11 @@ public class Synchronizer {
 			boolean notExist = true;
 			for (DavResource outputResource : resourcesOutput) {
 				if (inputResource.getPath().equals(outputResource.getPath())) {
+
 					log.debug(inputResource.getPath() + " exist on output");
 					if (!inputResource.isDirectory()
 							&& inputResource.getModified().after(outputResource.getModified())) {
+
 						log.info(inputResource.getPath() + " has on input a newer modifierd date");
 						if (!inputResource.getContentLength().equals(outputResource.getContentLength())) {
 							log.debug(inputResource.getPath() + " has a different content length: "
@@ -243,10 +313,16 @@ public class Synchronizer {
 	private boolean updateResource(DavResource newResource) {
 		String getUrl = createEncodedUrl(inputConnection, newResource.getPath());
 
+		if (maxFileSize != null && newResource.getContentLength() >= maxFileSize) {
+			log.warn(
+					"filesize of resource: " + newResource.getPath() + " is to big: " + newResource.getContentLength());
+			return true;
+		}
+
 		try {
 			InputStream inputStream = input.get(getUrl);
 			log.info("write input resource: " + newResource.getPath() + " ("
-					+ getFormatedContentLength(newResource.getContentLength())+") into temporarly file");
+					+ getFormatedContentLength(newResource.getContentLength()) + ") into temporarly file");
 			File tmpInputFile = writeStreamIntoFile(newResource, inputStream);
 
 			String putUrl = createEncodedUrl(outputConnection, newResource.getPath());
@@ -276,7 +352,8 @@ public class Synchronizer {
 			throws FileNotFoundException, IOException {
 		log.debug("start writeStreamIntoFile()");
 
-		File tmpInputFile = new File(tempDir.getAbsolutePath() + File.pathSeparator + inputResources.getName());
+		File tmpInputFile = new File(
+				tempDir.getAbsolutePath() + File.pathSeparator.replace(":", "/") + inputResources.getName());
 
 		Long freeSpace = FileSystemUtils.freeSpaceKb(tempDir.getAbsolutePath()) * 1024;
 		log.debug("free tmp space: " + freeSpace);
