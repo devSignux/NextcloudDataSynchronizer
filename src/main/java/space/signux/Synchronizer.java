@@ -134,15 +134,24 @@ public class Synchronizer {
 		String startOutputFolder = outputConnection.getUserFolder();
 
 		try {
-			log.info("read input resources");
-			List<DavResource> resourcesInput = getResourcesList(input, inputConnection, startInputFolder);
-			logRecourceList(resourcesInput);
-			log.info("read output resources");
-			List<DavResource> resourcesOutput = getResourcesList(output, outputConnection, startOutputFolder);
-			logRecourceList(resourcesOutput);
-			log.info("read finished");
+			 log.info("read input resources");
+			 List<DavResource> resourcesInput = getResourcesList(input,
+			 inputConnection, startInputFolder);
+			 logRecourceList(resourcesInput);
+			 log.info("read output resources");
+			 List<DavResource> resourcesOutput = getResourcesList(output,
+			 outputConnection, startOutputFolder);
+			 logRecourceList(resourcesOutput);
+			 log.info("read finished");
+			
+			 archiveResources(resourcesInput, resourcesOutput);
 
-			archiveResources(resourcesInput, resourcesOutput);
+			if (deleteOldInputFiles > 0) {
+				log.info("delete files which are older than " + deleteOldInputFiles + " days.");
+				deleteOldResources(getResourcesList(input, inputConnection, startInputFolder),
+						getResourcesList(output, outputConnection, startOutputFolder));
+
+			}
 
 			if (deleteOldInputFiles > 0) {
 				log.info("delete files which are older than " + deleteOldInputFiles + " days.");
@@ -160,7 +169,6 @@ public class Synchronizer {
 	}
 
 	private void deleteOldResources(List<DavResource> resourcesInput, List<DavResource> resourcesOutput) {
-
 		// calculate delete date
 		Calendar calendar = Calendar.getInstance();
 		calendar.setTime(new Date());
