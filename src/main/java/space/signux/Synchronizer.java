@@ -134,32 +134,22 @@ public class Synchronizer {
 		String startOutputFolder = outputConnection.getUserFolder();
 
 		try {
-			 log.info("read input resources");
-			 List<DavResource> resourcesInput = getResourcesList(input,
-			 inputConnection, startInputFolder);
-			 logRecourceList(resourcesInput);
-			 log.info("read output resources");
-			 List<DavResource> resourcesOutput = getResourcesList(output,
-			 outputConnection, startOutputFolder);
-			 logRecourceList(resourcesOutput);
-			 log.info("read finished");
-			
-			 archiveResources(resourcesInput, resourcesOutput);
+			log.info("read input resources");
+			List<DavResource> resourcesInput = getResourcesList(input, inputConnection, startInputFolder);
+			logRecourceList(resourcesInput);
+			log.info("read output resources");
+			List<DavResource> resourcesOutput = getResourcesList(output, outputConnection, startOutputFolder);
+			logRecourceList(resourcesOutput);
+			log.info("read finished");
 
-			if (deleteOldInputFiles > 0) {
+			archiveResources(resourcesInput, resourcesOutput);
+
+			if (deleteOldInputFiles != null && deleteOldInputFiles > 0) {
 				log.info("delete files which are older than " + deleteOldInputFiles + " days.");
 				deleteOldResources(getResourcesList(input, inputConnection, startInputFolder),
 						getResourcesList(output, outputConnection, startOutputFolder));
 
 			}
-
-			if (deleteOldInputFiles > 0) {
-				log.info("delete files which are older than " + deleteOldInputFiles + " days.");
-				deleteOldResources(getResourcesList(input, inputConnection, startInputFolder),
-						getResourcesList(output, outputConnection, startOutputFolder));
-
-			}
-
 		} catch (IOException e) {
 			log.error(e.getMessage(), e);
 		}
