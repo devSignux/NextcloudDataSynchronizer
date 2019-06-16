@@ -1,8 +1,14 @@
-inputUri=
+inputUri=https://cloud.signux.space
 inputSubfolder=
-inputUsername=
-inputPassword=
-outputUri=
+inputUsername=signux
+#inputPassword=alles2018#6Gute
+inputPassword=alles2019#3Gute
+outputUri=http://archiv.signux.space
 outputSubfolder=
-outputUsername=
-outputPassword=
+outputUsername=signux
+outputPassword=alles2017#1Gute
+# synchronize only files with the maxFileSize
+maxFileSize=1591722314
+# Delete old files in Input, which is only older than n-days
+deleteOldInputFiles=1000
+deleteBlacklist=deleteBlacklist.txt

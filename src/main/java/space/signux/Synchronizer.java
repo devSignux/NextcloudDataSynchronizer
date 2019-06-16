@@ -1,17 +1,21 @@
 package space.signux;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 
 import org.apache.commons.io.FileSystemUtils;
 import org.apache.log4j.Logger;
@@ -20,6 +24,8 @@ import org.apache.log4j.xml.DOMConfigurator;
 import com.github.sardine.DavResource;
 import com.github.sardine.Sardine;
 import com.github.sardine.SardineFactory;
+
+import space.signux.helper.Blacklist;
 
 public class Synchronizer {
 
@@ -35,6 +41,8 @@ public class Synchronizer {
 
 	private Sardine input;
 	private Sardine output;
+
+	private Set<String> deleteBlacklist;
 
 	public Synchronizer(String[] args) {
 		log.debug("create Synchronizer(args: " + Arrays.deepToString(args) + ")");
@@ -96,6 +104,15 @@ public class Synchronizer {
 			} catch (ClassCastException e) {
 				log.warn("Can't parse value for property deleteOldInputFiles");
 			}
+
+			// read property deleteBlacklist
+			try {
+				String deleteBlacklistFile = properties.getProperty("deleteBlacklist", null);
+				deleteBlacklist = Blacklist.getDeleteBlacklistFromFile(deleteBlacklistFile);
+			} catch (ClassCastException e) {
+				log.warn("Can't parse value for property deleteBlacklist");
+			}
+
 		} catch (FileNotFoundException e) {
 			log.error("Can't find file: " + filename);
 			return false;
@@ -135,10 +152,12 @@ public class Synchronizer {
 
 		try {
 			log.info("read input resources");
-			List<DavResource> resourcesInput = getResourcesList(input, inputConnection, startInputFolder);
+			List<DavResource> resourcesInput = getResourcesList(input, inputConnection, startInputFolder, -1);
 			logRecourceList(resourcesInput);
+			int maxInputDepth = getMaxDepthPath(resourcesInput);
 			log.info("read output resources");
-			List<DavResource> resourcesOutput = getResourcesList(output, outputConnection, startOutputFolder);
+			List<DavResource> resourcesOutput = getResourcesList(output, outputConnection, startOutputFolder,
+					maxInputDepth);
 			logRecourceList(resourcesOutput);
 			log.info("read finished");
 
@@ -146,8 +165,9 @@ public class Synchronizer {
 
 			if (deleteOldInputFiles != null && deleteOldInputFiles > 0) {
 				log.info("delete files which are older than " + deleteOldInputFiles + " days.");
-				deleteOldResources(getResourcesList(input, inputConnection, startInputFolder),
-						getResourcesList(output, outputConnection, startOutputFolder));
+				deleteOldResources(startInputFolder,
+						getResourcesList(input, inputConnection, startInputFolder, maxInputDepth),
+						getResourcesList(output, outputConnection, startOutputFolder, maxInputDepth));
 
 			}
 		} catch (IOException e) {
@@ -158,7 +178,8 @@ public class Synchronizer {
 		return true;
 	}
 
-	private void deleteOldResources(List<DavResource> resourcesInput, List<DavResource> resourcesOutput) {
+	private void deleteOldResources(String startInputFolder, List<DavResource> resourcesInput,
+			List<DavResource> resourcesOutput) {
 		// calculate delete date
 		Calendar calendar = Calendar.getInstance();
 		calendar.setTime(new Date());
@@ -170,13 +191,16 @@ public class Synchronizer {
 		long files = 0;
 		long contentLength = 0;
 		for (DavResource inputResource : resourcesInput) {
-
+			String path = inputResource.getPath().replace("/"+startInputFolder, "");
+			if (!Blacklist.deletePath(path, deleteBlacklist)) {
+				continue;
+			}
 			if (!inputResource.isDirectory() && inputResource.getModified().getTime() < deleteTimestamp
 					&& existsOutPutFile(inputResource, resourcesOutput)) {
 				log.info("delete Path: " + inputResource.getPath() + " ContentLength: "
 						+ inputResource.getContentLength() + " Date:" + inputResource.getModified().toString());
 				try {
-					String url = createEncodedUrl(inputConnection, inputResource.getPath());
+					String url = createEncodedUrl(inputConnection, inputResource.getPath(), false);
 					input.delete(url);
 
 					log.info("Path: " + inputResource.getPath() + " deleted.");
@@ -217,6 +241,22 @@ public class Synchronizer {
 				+ getFormatedContentLength(contentLength));
 	}
 
+	private int getMaxDepthPath(List<DavResource> resourcesInput) {
+		int maxDepth = 0;
+		String maxDepthPath = null;
+		for (DavResource davResource : resourcesInput) {
+			int depth = davResource.getPath().split("/").length;
+			if (depth > maxDepth) {
+				maxDepth = depth;
+				maxDepthPath = davResource.getPath();
+			}
+		}
+		// Todo: max depth berechnen durch abziehen des subpath...
+		log.debug("Max depth(full Path): " + maxDepth + " max depth: " + (maxDepth - 5) + " Max depth path: "
+				+ maxDepthPath);
+		return maxDepth;
+	}
+
 	private String getFormatedContentLength(long contentLength) {
 		int unit = 0;
 		for (; contentLength > 1048576; contentLength >>= 10) {
@@ -236,7 +276,11 @@ public class Synchronizer {
 			DavResource removeResource = null;
 			boolean notExist = true;
 			for (DavResource outputResource : resourcesOutput) {
-				if (inputResource.getPath().equals(outputResource.getPath())) {
+				String inputPathWithoutSubfolder = inputResource.getPath()
+						.substring(inputResource.getPath().indexOf("/remote.php"));
+				String outputPathWithoutSubfolder = outputResource.getPath()
+						.substring(outputResource.getPath().indexOf("/remote.php"));
+				if (inputPathWithoutSubfolder.equals(outputPathWithoutSubfolder)) {
 
 					log.debug(inputResource.getPath() + " exist on output");
 					if (!inputResource.isDirectory()
@@ -283,7 +327,7 @@ public class Synchronizer {
 			// first add new folders
 			for (DavResource newResource : newResources) {
 				if (newResource.isDirectory()) {
-					String putUrl = createEncodedUrl(outputConnection, newResource.getPath());
+					String putUrl = createEncodedUrl(outputConnection, newResource.getPath(), true);
 					log.info("create output directory: " + putUrl);
 					try {
 						output.createDirectory(putUrl);
@@ -309,7 +353,7 @@ public class Synchronizer {
 	}
 
 	private boolean updateResource(DavResource newResource) {
-		String getUrl = createEncodedUrl(inputConnection, newResource.getPath());
+		String getUrl = createEncodedUrl(inputConnection, newResource.getPath(), false);
 
 		if (maxFileSize != null && newResource.getContentLength() >= maxFileSize) {
 			log.warn(
@@ -323,7 +367,7 @@ public class Synchronizer {
 					+ getFormatedContentLength(newResource.getContentLength()) + ") into temporarly file");
 			File tmpInputFile = writeStreamIntoFile(newResource, inputStream);
 
-			String putUrl = createEncodedUrl(outputConnection, newResource.getPath());
+			String putUrl = createEncodedUrl(outputConnection, newResource.getPath(), true);
 			log.info("write temporarly file into output resource: " + putUrl);
 			output.put(putUrl, tmpInputFile, newResource.getContentType());
 
@@ -333,14 +377,15 @@ public class Synchronizer {
 		} catch (FileNotFoundException ex) {
 			log.error("can't create tmeporarly file for input resource: " + newResource.getPath(), ex);
 		} catch (IOException ex) {
-			log.error("error while reading input stream or writing data into temporarly file", ex);
+			log.error("error while reading input '" + newResource.getPath()
+					+ "' stream or writing data into temporarly file", ex);
 		}
-		return false;
+		return true;// wenn hier false zurück gegeben wird komme ich in eine endlosschleife...
 	}
 
-	private String createEncodedUrl(ConnectionSettings settings, String folderPath) {
+	private String createEncodedUrl(ConnectionSettings settings, String folderPath, boolean addSubfolder) {
 		log.debug("start createEncodedUrl()");
-		String url = settings.getFullFolderUri(folderPath);
+		String url = settings.getFullFolderUri(folderPath, addSubfolder);
 		url = encodeUrl(url);
 		log.debug("createEncodedUrl() finished with url: " + url);
 		return url;
@@ -379,12 +424,12 @@ public class Synchronizer {
 		return tmpInputFile;
 	}
 
-	private List<DavResource> getResourcesList(Sardine sardine, ConnectionSettings settings, String folder)
+	private List<DavResource> getResourcesList(Sardine sardine, ConnectionSettings settings, String folder, int depth)
 			throws IOException {
 		log.debug("start getResourcesList()");
 
-		String urlInput = createEncodedUrl(settings, folder);
-		List<DavResource> resources = sardine.list(urlInput, -1);
+		String urlInput = createEncodedUrl(settings, folder, false);
+		List<DavResource> resources = sardine.list(urlInput, depth);
 
 		log.debug("getResourcesList() finished");
 		return resources;

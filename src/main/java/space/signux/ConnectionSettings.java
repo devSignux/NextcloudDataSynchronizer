@@ -46,9 +46,9 @@ public class ConnectionSettings {
 		return userFolder;
 	}
 
-	public String getFullFolderUri(String folder) {
-		if (subfolder != null && !subfolder.isEmpty()) {
-			return uri + "/" + subfolder + "/" + folder;
+	public String getFullFolderUri(String folder, boolean addSubfolder) {
+		if (addSubfolder && subfolder != null && !subfolder.isEmpty()) {
+			return uri + "/" + subfolder + folder;
 		}
 		return uri + "/" + folder;
 	}
