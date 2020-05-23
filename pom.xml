@@ -8,7 +8,7 @@
 		<dependency>
 			<groupId>com.github.lookfirst</groupId>
 			<artifactId>sardine</artifactId>
-			<version>5.7</version>
+			<version>5.9</version>
 		</dependency>
 		<dependency>
 			<groupId>log4j</groupId>
@@ -19,6 +19,11 @@
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-io</artifactId>
 			<version>1.3.2</version>
+		</dependency>
+		<dependency>
+			<groupId>com.google.guava</groupId>
+			<artifactId>guava</artifactId>
+			<version>29.0-jre</version>
 		</dependency>
 	</dependencies>
 	<build>

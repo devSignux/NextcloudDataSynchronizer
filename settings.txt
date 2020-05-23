@@ -1,14 +1,23 @@
+# cloud
 inputUri=https://cloud.signux.space
 inputSubfolder=
 inputUsername=signux
-#inputPassword=alles2018#6Gute
 inputPassword=alles2019#3Gute
-outputUri=http://archiv.signux.space
+
+# archiv
+outputUri=https://archiv.signux.space
 outputSubfolder=
 outputUsername=signux
-outputPassword=alles2017#1Gute
-# synchronize only files with the maxFileSize
-maxFileSize=1591722314
+outputPassword=alles2020#1Gute
+
+# Delete files which are older than n days
+deleteFilesOlderThanDays=1092
+
 # Delete old files in Input, which is only older than n-days
-deleteOldInputFiles=1000
 deleteBlacklist=deleteBlacklist.txt
+
+# IPhoneImageConverter setting
+ffmpegPath=/usr/bin/ffmpeg
+imageMagickConvertPath=/usr/bin/convert
+originalIPhoneDataPath=Photos/IPhone
+outputPhotosDataPath=Photos

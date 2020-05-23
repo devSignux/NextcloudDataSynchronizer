@@ -52,4 +52,12 @@ public class ConnectionSettings {
 		}
 		return uri + "/" + folder;
 	}
+
+	public String getBaseFolder() {
+		return "/remote.php/dav/files/" + username + "/";
+	}
+
+	public String getBaseUrl() {
+		return uri;
+	}
 }
