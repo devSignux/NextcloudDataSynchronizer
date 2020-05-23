@@ -1,17 +1,17 @@
 # cloud
-inputUri=https://cloud.signux.space
+inputUri=
 inputSubfolder=
-inputUsername=signux
-inputPassword=alles2019#3Gute
+inputUsername=
+inputPassword=
 
 # archiv
-outputUri=https://archiv.signux.space
+outputUri=
 outputSubfolder=
-outputUsername=signux
-outputPassword=alles2020#1Gute
+outputUsername=
+outputPassword=
 
 # Delete files which are older than n days
-deleteFilesOlderThanDays=1092
+#deleteFilesOlderThanDays=1092
 
 # Delete old files in Input, which is only older than n-days
 deleteBlacklist=deleteBlacklist.txt
