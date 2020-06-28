@@ -3,6 +3,7 @@ package space.signux;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.IDN;
 import java.net.MalformedURLException;
@@ -82,9 +83,12 @@ public class Synchronizer {
 			in = new FileInputStream(settingsFile);
 			Properties properties = new Properties();
 			properties.load(in);
+			Encryptor encryptor = new Encryptor();
+			encryptor.encryptPasswords(properties);
+			properties.store(new FileOutputStream(settingsFile), null);
 
-			inputConnection = SettingsReader.CreateInputConnectionSettings(properties);
-			outputConnection = SettingsReader.CreateOutputConnectionSettings(properties);
+			inputConnection = SettingsReader.CreateInputConnectionSettings(properties, encryptor);
+			outputConnection = SettingsReader.CreateOutputConnectionSettings(properties, encryptor);
 
 			// read property deleteFilesOlderThanDays
 			try {

@@ -19,7 +19,6 @@ import org.apache.log4j.xml.DOMConfigurator;
 import com.github.sardine.DavResource;
 import com.github.sardine.Sardine;
 import com.github.sardine.SardineFactory;
-
 import com.google.common.io.Files;
 
 public class IPhoneImageConverter {
@@ -73,8 +72,11 @@ public class IPhoneImageConverter {
 			in = new FileInputStream(settingsFile);
 			Properties properties = new Properties();
 			properties.load(in);
+			Encryptor encryptor = new Encryptor();
+			encryptor.encryptPasswords(properties);
+			properties.store(new FileOutputStream(settingsFile), null);
 
-			inputConnection = SettingsReader.CreateInputConnectionSettings(properties);
+			inputConnection = SettingsReader.CreateInputConnectionSettings(properties, encryptor);
 			log.info("Input(" + inputConnection.getUsername() + "): " + inputConnection.getBaseUrl());
 
 			// read property ffmpegPath
