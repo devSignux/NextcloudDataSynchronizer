@@ -232,7 +232,7 @@ public class Synchronizer {
 		} else {
 			if (cloudResource.isDirectory()) {
 				log.info("Create in archiv the new directory: '" + cloudResource.getPath() + "'");
-				output.createDirectory(cloudResource.getPath());
+				output.createDirectory(getEncodedUrl(cloudResource.getPath(),outputConnection));
 				return true;
 			} else {
 				log.info("Create in archiv the new file: '" + cloudResource.getPath() + "'");
